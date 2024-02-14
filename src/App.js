@@ -101,28 +101,30 @@ function App() {
     const userTransGroupedByMonthYear = groupBy(filteredData, transaction => transaction.event_time.toISOString().slice(0, 7));
 
     // prepare data for chart
-    const userDataForChart = Object.keys(userTransGroupedByMonthYear).map(monthYearKey => {
+    let userDataForChart = Object.keys(userTransGroupedByMonthYear).map(monthYearKey => {
         const transactionsOfMonthYear = userTransGroupedByMonthYear[monthYearKey];
         const monthYearRevenue = sumBy(transactionsOfMonthYear, transaction =>
             transaction.event_type === 'purchase' ? parseFloat(transaction.amount) : 0
         );
         return {
             month: monthYearKey,
-            Actual: monthYearRevenue,
+            Actual: Math.round(monthYearRevenue),
             Predicted: 0
         };
     });
 
+    userDataForChart = userDataForChart.filter(data => data.month <= '2021-01');
+
     if (showUserTimeline) {
         const prediction = predictions[selectedUser];
-        const existingData = userDataForChart.find(data => data.month === '2021-01' && data.user_id === selectedUser);
+        const existingData = userDataForChart.find(data => data.month === '2021-01');
         if(existingData){
             existingData.Predicted = prediction;
         } else {
             userDataForChart.push({
                 month: '2021-01',
                 Actual: 0,
-                Predicted: prediction
+                Predicted:  Math.round(prediction)
             });
         }
     }
