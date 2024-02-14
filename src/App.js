@@ -109,20 +109,17 @@ function App() {
         return {
             month: monthYearKey,
             Actual: Math.round(monthYearRevenue),
-            Predicted: 0
         };
     });
 
-    userDataForChart = userDataForChart.filter(data => data.month <= '2021-01');
-
     if (showUserTimeline) {
         const prediction = predictions[selectedUser];
-        const existingData = userDataForChart.find(data => data.month === '2021-01');
+        const existingData = userDataForChart.find(data => data.month === '2021-02');
         if(existingData){
             existingData.Predicted = prediction;
         } else {
             userDataForChart.push({
-                month: '2021-01',
+                month: '2021-02',
                 Actual: 0,
                 Predicted:  Math.round(prediction)
             });
