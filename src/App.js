@@ -1,11 +1,13 @@
 import React, {useCallback, useEffect, useState} from "react";
-import { filter, includes, sortBy, toLower } from "lodash";
+import {filter, groupBy, includes, sortBy, sumBy, toLower} from "lodash";
 import Papa from "papaparse";
-import './App.css'; // import CSS file
+import './App.css';
+import RevenueChart from "./RevenueChart"; // import CSS file
 
 function App() {
     const [data, setData] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [predictions, setPredictions] = useState({});
     const [filteredData, setFilteredData] = useState(data);
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -25,6 +27,19 @@ function App() {
                 }));
                 setData(transactions);
                 setFilteredData(transactions);
+            })
+            .catch(error => console.log(`Error! Unable to load the CSV file: ${error}`));
+
+        const predictionsFilePath = '/export.csv';
+        fetch(predictionsFilePath)
+            .then(response => response.text())
+            .then(data => {
+                const csv = Papa.parse(data, { header: true, skipEmptyLines: true });
+                const predictionsData = csv.data.reduce((acc, curr) => {
+                    acc[curr.User_id] = parseFloat(curr.Prediction);
+                    return acc;
+                }, {});
+                setPredictions(predictionsData);
             })
             .catch(error => console.log(`Error! Unable to load the CSV file: ${error}`));
     }, []);
@@ -82,6 +97,39 @@ function App() {
         setCurrentPage(1);
     };
 
+    // group by month-year and calculate revenue
+    const userTransGroupedByMonthYear = groupBy(filteredData, transaction => transaction.event_time.toISOString().slice(0, 7));
+
+    // prepare data for chart
+    const userDataForChart = Object.keys(userTransGroupedByMonthYear).map(monthYearKey => {
+        const transactionsOfMonthYear = userTransGroupedByMonthYear[monthYearKey];
+        const monthYearRevenue = sumBy(transactionsOfMonthYear, transaction =>
+            transaction.event_type === 'purchase' ? parseFloat(transaction.amount) : 0
+        );
+        return {
+            month: monthYearKey,
+            Actual: monthYearRevenue,
+            Predicted: 0
+        };
+    });
+
+    if (showUserTimeline) {
+        const prediction = predictions[selectedUser];
+        const existingData = userDataForChart.find(data => data.month === '2021-01' && data.user_id === selectedUser);
+        if(existingData){
+            existingData.Predicted = prediction;
+        } else {
+            userDataForChart.push({
+                month: '2021-01',
+                Actual: 0,
+                Predicted: prediction
+            });
+        }
+    }
+
+
+
+
     return (
         <div className="App">
             <h1 className="header-title">Customer Transactions</h1>
@@ -136,20 +184,12 @@ function App() {
             {
                 showUserTimeline && selectedUser && (
                     <div className="timeline-container">
-                        <h2>User ID: {selectedUser} - Purchase Timeline</h2>
-                        <ul className="timeline">
-                            {currentTransactions.map((transaction) => (
-                                <li key={`${transaction.id}_${transaction.event_time.getMilliseconds()}`}>
-                                    <strong>Date:</strong> {transaction.event_time.toLocaleString()}<br/>
-                                    <strong>Amount:</strong> {transaction.amount}<br/>
-                                    <strong>Event Type:</strong> {transaction.event_type}<br/>
-                                    <strong>Category Code:</strong> {transaction.category_code}<br/>
-                                    <strong>Brand:</strong> {transaction.brand}<br/>
-                                    <strong>User Session:</strong> {transaction.user_session}
-                                </li>
-                            ))}
-                        </ul>
+                        <div className="timeline-container">
+                            <h2>User ID: {selectedUser} - Purchase Timeline</h2>
+                            <RevenueChart userData={userDataForChart}/>
+                        </div>
                     </div>
+
                 )
             }
         </div>
